@@ -170,17 +170,38 @@ Example response:
 
 ## Model Checkpoints
 
-The backend loads model checkpoints from `models/pretrained/` based on
-`config/settings.py`.
+The backend loads model checkpoints from a local path or from Hugging Face Hub
+based on environment variables and `config/settings.py`.
 
 Common checkpoint names:
 
 - `vit.pth`
+- `vit3.pth`
 - `xception.pth`
 - `pg_fdd.pth`
 
 Large model binaries are excluded from source control. Keep checkpoints in local
 or approved storage and distribute them according to license terms.
+
+### Hugging Face Hub on Render
+
+For deployment, upload the checkpoint to a Hugging Face model repository and set
+these Render backend environment variables:
+
+```text
+HF_MODEL_REPO=your-username/faceguard-vit3
+HF_MODEL_FILE=vit3.pth
+HF_TOKEN=your_hugging_face_read_token
+MODEL_CACHE_DIR=/tmp/faceguard_models
+FACEGUARD_MODEL_NAME=vit
+FACEGUARD_FRONTEND_ORIGINS=https://your-vercel-app.vercel.app
+```
+
+If you want to keep local development using a file on disk, set:
+
+```text
+FACEGUARD_MODEL_PATH=models/baseline/vit3.pth
+```
 
 ## Design and Project Artifacts
 

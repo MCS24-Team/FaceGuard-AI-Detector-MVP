@@ -16,6 +16,14 @@ def _env_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _env_csv(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    entries = tuple(item.strip() for item in value.split(",") if item.strip())
+    return entries or default
+
+
 @dataclass(frozen=True)
 class FaceGuardSettings:
     app_name: str = "FaceGuard MVP"
@@ -25,8 +33,13 @@ class FaceGuardSettings:
     # Uncomment ONE block below, then restart the backend.
     #
     # ViT-B/16 (currently active):
-    model_name: str = "vit"
-    model_path: Path = REPO_ROOT / "models" / "baseline" / "vit9.pth"
+    model_name: str = os.getenv("FACEGUARD_MODEL_NAME", "vit")
+    model_path: Path = Path(
+        os.getenv(
+            "FACEGUARD_MODEL_PATH",
+            str(REPO_ROOT / "models" / "baseline" / os.getenv("HF_MODEL_FILE", "vit3.pth")),
+        )
+    )
     #
     # Xception:
     # model_name: str = "xception"
@@ -51,6 +64,7 @@ class FaceGuardSettings:
     backend_host: str = "127.0.0.1"
     backend_port: int = 8000
     frontend_origin: str = os.getenv("FACEGUARD_FRONTEND_ORIGIN", "http://localhost:5173")
+    frontend_origins: tuple[str, ...] = _env_csv("FACEGUARD_FRONTEND_ORIGINS", (frontend_origin,))
 
     # Optional MongoDB persistence and auth settings
     enable_database: bool = _env_bool("FACEGUARD_ENABLE_DATABASE", False)
