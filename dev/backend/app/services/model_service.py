@@ -10,6 +10,7 @@ To add a new model:
 from __future__ import annotations
 
 import base64
+import os
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
@@ -206,13 +207,14 @@ class InferenceService:
             self._ready = True
 
     def _load_model(self) -> nn.Module:
-        if not self.model_path.exists():
+        checkpoint_path = self._resolve_checkpoint_path()
+        if not checkpoint_path.exists():
             raise FileNotFoundError(
-                f"Checkpoint not found at '{self.model_path}'. Place the .pth file in models/pretrained/."
+                f"Checkpoint not found at '{checkpoint_path}'. Place the .pth file locally or configure HF_MODEL_REPO."
             )
 
         model = self._spec.build_fn()
-        checkpoint = torch.load(self.model_path, map_location=self.device)
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
 
         if isinstance(checkpoint, dict):
             for wrapper_key in ("state_dict", "model_state_dict"):
@@ -232,6 +234,31 @@ class InferenceService:
         model.to(self.device)
         model.eval()
         return model
+
+    def _resolve_checkpoint_path(self) -> Path:
+        repo_id = os.getenv("HF_MODEL_REPO")
+        if not repo_id:
+            return self.model_path
+
+        try:
+            from huggingface_hub import hf_hub_download
+        except ImportError as exc:
+            raise RuntimeError(
+                "HF_MODEL_REPO is configured, but huggingface_hub is not installed."
+            ) from exc
+
+        checkpoint_file = os.getenv("HF_MODEL_FILE", self.model_path.name)
+        cache_dir = os.getenv("MODEL_CACHE_DIR", "/tmp/faceguard_models")
+        token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_HUB_TOKEN")
+
+        return Path(
+            hf_hub_download(
+                repo_id=repo_id,
+                filename=checkpoint_file,
+                token=token,
+                cache_dir=cache_dir,
+            )
+        )
 
     def _forward_model(self, image_tensor: torch.Tensor) -> Any:
         if self._model is None:

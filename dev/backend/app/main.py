@@ -38,7 +38,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_origin],
+    allow_origins=list(settings.frontend_origins),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,8 +49,8 @@ app.add_middleware(
 def startup_event() -> None:
     try:
         model_service.ensure_loaded()
-    except FileNotFoundError:
-        # Allow app startup even when checkpoint is missing.
+    except Exception:
+        # Allow app startup so /api/health can report model readiness.
         return
 
 
@@ -107,7 +107,7 @@ def sign_up(payload: SignUpRequest) -> SignUpResponse:
 def analyze_image(file: UploadFile = File(...)) -> PredictionResponse:
     try:
         model_service.ensure_loaded()
-    except FileNotFoundError as exc:
+    except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     raw = validate_upload(

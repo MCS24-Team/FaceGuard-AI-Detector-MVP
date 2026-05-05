@@ -114,13 +114,37 @@ If `model_ready` is `false`, confirm that the configured checkpoint exists in
 
 ## 6. Model Switching Procedure
 
-Model selection is controlled by `config/settings.py`.
+Model selection is controlled by environment variables and `config/settings.py`.
 
 Typical configuration values:
 
 ```python
 model_name: str = "vit"
-model_path: Path = REPO_ROOT / "models" / "pretrained" / "vit.pth"
+model_path: Path = REPO_ROOT / "models" / "baseline" / "vit3.pth"
+```
+
+Environment overrides:
+
+```powershell
+$env:FACEGUARD_MODEL_NAME="vit"
+$env:FACEGUARD_MODEL_PATH="models/baseline/vit3.pth"
+```
+
+For Render deployments that download the checkpoint from Hugging Face Hub:
+
+```text
+HF_MODEL_REPO=your-username/faceguard-vit3
+HF_MODEL_FILE=vit3.pth
+HF_TOKEN=your_hugging_face_read_token
+MODEL_CACHE_DIR=/tmp/faceguard_models
+FACEGUARD_MODEL_NAME=vit
+FACEGUARD_FRONTEND_ORIGINS=https://your-vercel-app.vercel.app
+```
+
+For Vercel frontend deployments, set:
+
+```text
+VITE_API_BASE_URL=https://your-render-backend.onrender.com
 ```
 
 After editing model settings:
