@@ -7,6 +7,20 @@ class HealthResponse(BaseModel):
     model_name: str
 
 
+class ReportItem(BaseModel):
+    title: str
+    score: float = Field(ge=0.0, le=100.0)
+    severity: str = "normal"
+    description: str
+
+
+class DetectionReport(BaseModel):
+    image_type: str = "Portrait Photo"
+    overall_forgery_score: float = Field(ge=0.0, le=100.0)
+    summary: str
+    breakdown: list[ReportItem]
+
+
 class PredictionResponse(BaseModel):
     label: str = Field(description="REAL or FAKE")
     confidence: float = Field(ge=0.0, le=1.0)
@@ -22,6 +36,7 @@ class PredictionResponse(BaseModel):
         default="grad_cam",
         description="Explainability method used to generate the overlay.",
     )
+    report: DetectionReport | None = None
 
 
 class SignInRequest(BaseModel):

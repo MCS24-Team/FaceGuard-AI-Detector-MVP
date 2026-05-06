@@ -24,6 +24,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .architectures import FairDetector, Xception
+from .clip_vit_detector import ClipVitLargeDeepfakeDetector
 
 try:
     from pytorch_grad_cam import GradCAM
@@ -95,6 +96,8 @@ class _CamModelAdapter(nn.Module):
                 output = output["cls"]
             elif "logits" in output:
                 output = output["logits"]
+            elif "logits_labels" in output:
+                output = output["logits_labels"]
 
         if not isinstance(output, torch.Tensor):
             raise TypeError("Grad-CAM adapter expected tensor logits output.")
@@ -115,6 +118,10 @@ def _build_xception() -> nn.Module:
 
 def _build_pg_fdd() -> nn.Module:
     return FairDetector()
+
+
+def _build_clip_vit() -> nn.Module:
+    return ClipVitLargeDeepfakeDetector()
 
 
 def _extract_sigmoid_scalar(output: Any) -> float:
@@ -138,7 +145,21 @@ def _extract_pg_fdd(output: Any) -> float:
     return torch.sigmoid(logits)[0].item()
 
 
+def _extract_clip_vit(output: Any) -> float:
+    logits = output["logits_labels"] if isinstance(output, dict) else output.logits_labels
+    probabilities = torch.softmax(logits, dim=-1)
+    return probabilities[0, 1].item()
+
+
 MODEL_REGISTRY: dict[str, ModelSpec] = {
+    "clip_vit": ModelSpec(
+        build_fn=_build_clip_vit,
+        image_size=224,
+        mean=(0.48145466, 0.4578275, 0.40821073),
+        std=(0.26862954, 0.26130258, 0.27577711),
+        description="CLIP ViT-L/14 deepfake classifier",
+        extract_prob=_extract_clip_vit,
+    ),
     "vit": ModelSpec(
         build_fn=_build_vit,
         image_size=224,
@@ -168,6 +189,9 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
 
 def _resolve_spec(model_name: str) -> ModelSpec:
     name_lower = model_name.lower()
+    if name_lower in MODEL_REGISTRY:
+        return MODEL_REGISTRY[name_lower]
+
     for key, spec in MODEL_REGISTRY.items():
         if key in name_lower:
             return spec
@@ -328,6 +352,9 @@ class InferenceService:
         label: str,
         source_image: Image.Image | None = None,
     ) -> str | None:
+        if "clip_vit" in self.model_name.lower():
+            return None
+
         if self._model is None or GradCAM is None or show_cam_on_image is None:
             return None
 

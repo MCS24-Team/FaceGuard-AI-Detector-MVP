@@ -4,6 +4,7 @@ from io import BytesIO
 from typing import Iterable
 
 from fastapi import HTTPException, UploadFile
+import numpy as np
 from PIL import Image, ImageOps
 import torch
 from torchvision import transforms
@@ -37,6 +38,76 @@ def strip_exif_and_load_image(raw: bytes) -> Image.Image:
     source.save(cleaned_buffer, format="PNG")
     cleaned_buffer.seek(0)
     return Image.open(cleaned_buffer).convert("RGB")
+
+
+def crop_largest_face(image: Image.Image, enabled: bool = True, margin: float = 0.35) -> Image.Image:
+    if not enabled:
+        return image
+
+    try:
+        import cv2
+    except ImportError:
+        return image
+
+    rgb = np.asarray(image.convert("RGB"))
+    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+
+    max_dimension = max(gray.shape)
+    scale = 1.0
+    if max_dimension > 1000:
+        scale = 1000.0 / max_dimension
+        gray_for_detection = cv2.resize(
+            gray,
+            (int(gray.shape[1] * scale), int(gray.shape[0] * scale)),
+            interpolation=cv2.INTER_AREA,
+        )
+    else:
+        gray_for_detection = gray
+
+    face_boxes: list[tuple[int, int, int, int]] = []
+    cascade_names = (
+        "haarcascade_frontalface_default.xml",
+        "haarcascade_frontalface_alt2.xml",
+        "haarcascade_profileface.xml",
+    )
+
+    for cascade_name in cascade_names:
+        cascade_path = cv2.data.haarcascades + cascade_name
+        detector = cv2.CascadeClassifier(cascade_path)
+        if detector.empty():
+            continue
+
+        detected = detector.detectMultiScale(
+            gray_for_detection,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(40, 40),
+        )
+        for x, y, width, height in detected:
+            if scale != 1.0:
+                x = int(x / scale)
+                y = int(y / scale)
+                width = int(width / scale)
+                height = int(height / scale)
+            face_boxes.append((x, y, width, height))
+
+    if not face_boxes:
+        return image
+
+    x, y, width, height = max(face_boxes, key=lambda box: box[2] * box[3])
+    margin = max(0.0, min(margin, 1.0))
+    pad_x = int(width * margin)
+    pad_y = int(height * margin)
+
+    left = max(0, x - pad_x)
+    top = max(0, y - pad_y)
+    right = min(image.width, x + width + pad_x)
+    bottom = min(image.height, y + height + pad_y)
+
+    if right <= left or bottom <= top:
+        return image
+
+    return image.crop((left, top, right, bottom)).convert("RGB")
 
 
 def build_inference_transform(
