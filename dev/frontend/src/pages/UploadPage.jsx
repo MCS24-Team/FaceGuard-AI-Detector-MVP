@@ -6,10 +6,63 @@ import { APP_CONFIG } from "@/constants";
 function formatModelName(modelName = "") {
   const normalized = String(modelName).toLowerCase();
   if (!normalized) return "Unknown";
-  if (normalized === "vit") return "ViT-B/16";
+  if (normalized.includes("clip")) return "CLIP ViT-L/14";
+  if (normalized.includes("vit")) return "ViT-B/16";
   if (normalized === "xception") return "Xception";
   if (normalized === "pg_fdd") return "PG-FDD";
   return modelName;
+}
+
+function severityLabel(severity = "normal") {
+  if (severity === "high") return "High";
+  if (severity === "warning") return "Warning";
+  if (severity === "mild") return "Mild";
+  return "Normal";
+}
+
+function DetectionReport({ report }) {
+  if (!report) return null;
+
+  const score = Number(report.overall_forgery_score || 0);
+  const scoreTone = score >= 67 ? "report-score-risk" : score >= 34 ? "report-score-caution" : "report-score-safe";
+
+  return (
+    <section className="detection-report">
+      <div className="report-heading">
+        <div>
+          <p className="report-kicker">Detection Report</p>
+          <h4>{report.image_type || "Uploaded Image"}</h4>
+        </div>
+        <div className={`report-score ${scoreTone}`}>
+          <span>Overall Forgery Score</span>
+          <strong>{score.toFixed(1)}%</strong>
+        </div>
+      </div>
+
+      <div className="report-summary">
+        <p className="report-section-title">Analysis Summary</p>
+        <p>{report.summary}</p>
+      </div>
+
+      <div className="report-breakdown">
+        <p className="report-section-title">Detailed Breakdown</p>
+        {report.breakdown?.map((item) => (
+          <article className={`report-item report-item-${item.severity || "normal"}`} key={item.title}>
+            <div className="report-item-header">
+              <div>
+                <span className={`report-severity report-severity-${item.severity || "normal"}`}>
+                  {severityLabel(item.severity)}
+                </span>
+                <h5>{item.title}</h5>
+              </div>
+              <strong>{Number(item.score || 0).toFixed(1)}%</strong>
+            </div>
+            <p>{item.description}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 export default function UploadPage() {
@@ -185,6 +238,8 @@ export default function UploadPage() {
                 </div>
 
                 <p className="result-explanation">{result.explanation}</p>
+
+                <DetectionReport report={result.report} />
 
                 {result.heatmap_overlay ? (
                   <div className="heatmap-panel">

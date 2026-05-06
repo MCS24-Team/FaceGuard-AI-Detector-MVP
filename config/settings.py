@@ -24,6 +24,23 @@ def _env_csv(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
     return entries or default
 
 
+def _env_float(name: str, default: float) -> float:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        return default
+
+
+def _repo_relative_path(value: str) -> Path:
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    return REPO_ROOT / path
+
+
 @dataclass(frozen=True)
 class FaceGuardSettings:
     app_name: str = "FaceGuard MVP"
@@ -34,10 +51,10 @@ class FaceGuardSettings:
     #
     # ViT-B/16 (currently active):
     model_name: str = os.getenv("FACEGUARD_MODEL_NAME", "vit")
-    model_path: Path = Path(
+    model_path: Path = _repo_relative_path(
         os.getenv(
             "FACEGUARD_MODEL_PATH",
-            str(REPO_ROOT / "models" / "baseline" / os.getenv("HF_MODEL_FILE", "vit3.pth")),
+            str(Path("models") / "baseline" / os.getenv("HF_MODEL_FILE", "vit3.pth")),
         )
     )
     #
@@ -49,7 +66,7 @@ class FaceGuardSettings:
     # model_name: str = "pg_fdd"
     # model_path: Path = REPO_ROOT / "models" / "pretrained" / "pg_fdd.pth"
     #
-    fake_threshold: float = 0.5
+    fake_threshold: float = _env_float("FACEGUARD_FAKE_THRESHOLD", 0.25)
 
     # Upload policy
     max_upload_mb: int = 10
@@ -59,10 +76,13 @@ class FaceGuardSettings:
         "image/png",
         "image/webp",
     )
+    enable_face_crop: bool = _env_bool("FACEGUARD_ENABLE_FACE_CROP", False)
+    face_crop_margin: float = _env_float("FACEGUARD_FACE_CROP_MARGIN", 0.35)
+    enable_detection_report: bool = _env_bool("FACEGUARD_ENABLE_DETECTION_REPORT", True)
 
     # Frontend/backend local development
     backend_host: str = "127.0.0.1"
-    backend_port: int = 8000
+    backend_port: int = 8001
     frontend_origin: str = os.getenv("FACEGUARD_FRONTEND_ORIGIN", "http://localhost:5173")
     frontend_origins: tuple[str, ...] = _env_csv("FACEGUARD_FRONTEND_ORIGINS", (frontend_origin,))
 
