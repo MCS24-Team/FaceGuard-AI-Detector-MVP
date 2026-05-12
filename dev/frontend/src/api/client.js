@@ -64,3 +64,23 @@ export async function signUp(credentials) {
   return payload;
 }
 
+export async function googleAuth(credential) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/google`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ credential })
+  });
+
+  const payload = await response.json();
+  if (!response.ok) {
+    const { detail } = payload;
+    if (Array.isArray(detail)) {
+      throw new Error(detail.map((item) => item?.msg).filter(Boolean).join("; ") || "Google sign in failed.");
+    }
+    throw new Error(detail || "Google sign in failed.");
+  }
+  return payload;
+}
+

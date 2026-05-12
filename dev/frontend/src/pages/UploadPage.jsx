@@ -9,6 +9,7 @@ function formatModelName(modelName = "") {
   if (normalized.includes("clip")) return "CLIP ViT-L/14";
   if (normalized.includes("vit")) return "ViT-B/16";
   if (normalized === "xception") return "Xception";
+  if (normalized === "hybrid_score_fusion") return "ViT + Xception Fusion";
   if (normalized === "pg_fdd") return "PG-FDD";
   return modelName;
 }

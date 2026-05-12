@@ -46,8 +46,8 @@ class FaceGuardSettings:
     app_name: str = "FaceGuard MVP"
     app_version: str = "0.1.0"
 
-    # ── Active model ─────────────────────────────────────────────
-    # Uncomment ONE block below, then restart the backend.
+    # Active model
+    # Uncomment ONE model_name/model_path block below, then restart the backend.
     #
     # ViT-B/16 (currently active):
     model_name: str = os.getenv("FACEGUARD_MODEL_NAME", "vit")
@@ -60,7 +60,7 @@ class FaceGuardSettings:
     #
     # Xception:
     # model_name: str = "xception"
-    # model_path: Path = REPO_ROOT / "models" / "pretrained" / "xception.pth"
+    # model_path: Path = REPO_ROOT / "models" / "baseline" / "xception.pth"
     #
     # PG-FDD (Fair Deepfake Detector):
     # model_name: str = "pg_fdd"
@@ -85,6 +85,7 @@ class FaceGuardSettings:
     backend_port: int = 8001
     frontend_origin: str = os.getenv("FACEGUARD_FRONTEND_ORIGIN", "http://localhost:5173")
     frontend_origins: tuple[str, ...] = _env_csv("FACEGUARD_FRONTEND_ORIGINS", (frontend_origin,))
+    google_client_id: str = os.getenv("FACEGUARD_GOOGLE_CLIENT_ID", "")
 
     # Optional MongoDB persistence and auth settings
     enable_database: bool = _env_bool("FACEGUARD_ENABLE_DATABASE", False)

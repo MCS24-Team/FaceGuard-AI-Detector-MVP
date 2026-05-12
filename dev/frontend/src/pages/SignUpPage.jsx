@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { signUp } from "@/api/client";
+import GoogleAuthButton from "@/components/GoogleAuthButton";
 import logo from "@/assets/logo.png";
 
-export default function SignUpPage() {
+export default function SignUpPage({ onSignInSuccess }) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -56,6 +59,18 @@ export default function SignUpPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleGoogleSuccess = (response) => {
+    setIsError(false);
+    setMessage(response.message || "Google account created and signed in.");
+    onSignInSuccess?.();
+    navigate("/", { replace: true });
+  };
+
+  const handleGoogleError = (error) => {
+    setIsError(true);
+    setMessage(error.message || "Unable to continue with Google.");
   };
 
   return (
@@ -126,6 +141,12 @@ export default function SignUpPage() {
               {isSubmitting ? "Creating Account..." : "Sign Up"}
             </button>
           </form>
+
+          <div className="auth-divider">
+            <span>or</span>
+          </div>
+
+          <GoogleAuthButton onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
 
           {message ? (
             <p className={isError ? "auth-feedback auth-feedback-error" : "auth-feedback auth-feedback-success"}>
