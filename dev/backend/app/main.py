@@ -3,9 +3,13 @@ from __future__ import annotations
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 
 from .core.settings_loader import load_settings
 from .schemas import (
+    GoogleAuthRequest,
+    GoogleAuthResponse,
     HealthResponse,
     PredictionResponse,
     SignInRequest,
@@ -15,7 +19,7 @@ from .schemas import (
 )
 from .services.auth_service import AuthService
 from .services.model_service import model_service_from_settings
-from .services.preprocessing import crop_largest_face, image_to_tensor, strip_exif_and_load_image, validate_upload
+from .services.preprocessing import crop_largest_face, strip_exif_and_load_image, validate_upload
 from .services.report_service import ReportService
 from .services.storage_placeholder import StoragePlaceholder
 
@@ -103,6 +107,44 @@ def sign_up(payload: SignUpRequest) -> SignUpResponse:
         raise HTTPException(status_code=status_code, detail=message)
 
     return SignUpResponse(success=True, message=message)
+
+
+@app.post("/api/auth/google", response_model=GoogleAuthResponse)
+def google_auth(payload: GoogleAuthRequest) -> GoogleAuthResponse:
+    if not settings.google_client_id:
+        raise HTTPException(
+            status_code=503,
+            detail="Google sign-in is not configured. Set FACEGUARD_GOOGLE_CLIENT_ID.",
+        )
+
+    try:
+        claims = google_id_token.verify_oauth2_token(
+            payload.credential,
+            google_requests.Request(),
+            settings.google_client_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail="Invalid Google sign-in token.") from exc
+
+    if not claims.get("email_verified"):
+        raise HTTPException(status_code=401, detail="Google account email is not verified.")
+
+    email = str(claims.get("email") or "").strip()
+    google_sub = str(claims.get("sub") or "").strip()
+    name = claims.get("name")
+    picture = claims.get("picture")
+
+    success, message, status_code = auth_service.authenticate_google_user(
+        email=email,
+        google_sub=google_sub,
+        name=str(name) if name else None,
+        picture=str(picture) if picture else None,
+    )
+
+    if not success:
+        raise HTTPException(status_code=status_code, detail=message)
+
+    return GoogleAuthResponse(success=True, message=message, email=email, name=name)
 
 
 @app.post("/api/analyze", response_model=PredictionResponse)

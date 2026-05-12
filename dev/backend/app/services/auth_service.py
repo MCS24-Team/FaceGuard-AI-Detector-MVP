@@ -97,6 +97,73 @@ class AuthService:
 
 		return True, "Account created. You can now sign in.", 201
 
+	def authenticate_google_user(
+		self,
+		email: str,
+		google_sub: str,
+		name: str | None = None,
+		picture: str | None = None,
+	) -> tuple[bool, str, int]:
+		if not self.enabled:
+			return (
+				False,
+				"Google sign-in is disabled. Set FACEGUARD_ENABLE_DATABASE=true and configure MongoDB settings.",
+				503,
+			)
+
+		normalized_email = email.strip().lower()
+		if not normalized_email or not google_sub:
+			return False, "Google account details are incomplete.", 400
+
+		try:
+			users = self._get_users_collection()
+			existing_user = users.find_one(
+				{
+					"$or": [
+						{"google_sub": google_sub},
+						{
+							"email": {
+								"$regex": f"^{re.escape(normalized_email)}$",
+								"$options": "i",
+							}
+						},
+					]
+				}
+			)
+
+			now = datetime.now(timezone.utc)
+			google_profile = {
+				"email": normalized_email,
+				"google_sub": google_sub,
+				"auth_provider": "google",
+				"name": name,
+				"picture": picture,
+				"last_login_at": now,
+			}
+
+			if existing_user:
+				users.update_one(
+					{"_id": existing_user["_id"]},
+					{"$set": google_profile},
+					upsert=False,
+				)
+				return True, "Google sign in successful.", 200
+
+			users.insert_one(
+				{
+					**google_profile,
+					"created_at": now,
+				}
+			)
+		except PyMongoError as exc:
+			return (
+				False,
+				f"Database connection failed ({exc.__class__.__name__}). Verify FACEGUARD_DATABASE_URL and MongoDB network access.",
+				503,
+			)
+
+		return True, "Google account created and signed in.", 201
+
 	def _get_users_collection(self) -> Collection:
 		if self._client is None:
 			self._client = MongoClient(self.database_url, serverSelectionTimeoutMS=5000)

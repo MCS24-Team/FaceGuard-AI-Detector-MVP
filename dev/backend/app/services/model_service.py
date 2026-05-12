@@ -22,6 +22,7 @@ from PIL import Image
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision import transforms
 
 from .architectures import FairDetector, Xception
 from .clip_vit_detector import ClipVitLargeDeepfakeDetector
@@ -232,13 +233,16 @@ class InferenceService:
 
     def _load_model(self) -> nn.Module:
         checkpoint_path = self._resolve_checkpoint_path()
-        if not checkpoint_path.exists():
+        return self._load_model_from_path(self._spec, checkpoint_path)
+
+    def _load_model_from_path(self, spec: ModelSpec, model_path: Path) -> nn.Module:
+        if not model_path.exists():
             raise FileNotFoundError(
-                f"Checkpoint not found at '{checkpoint_path}'. Place the .pth file locally or configure HF_MODEL_REPO."
+                f"Checkpoint not found at '{model_path}'. Place the .pth file locally or configure HF_MODEL_REPO."
             )
 
-        model = self._spec.build_fn()
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        model = spec.build_fn()
+        checkpoint = torch.load(model_path, map_location=self.device)
 
         if isinstance(checkpoint, dict):
             for wrapper_key in ("state_dict", "model_state_dict"):
@@ -284,6 +288,16 @@ class InferenceService:
             )
         )
 
+    def _tensor_from_image(self, image: Image.Image, spec: ModelSpec) -> torch.Tensor:
+        transform = transforms.Compose(
+            [
+                transforms.Resize((spec.image_size, spec.image_size)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=list(spec.mean), std=list(spec.std)),
+            ]
+        )
+        return transform(image).unsqueeze(0).to(self.device)
+
     def _forward_model(self, image_tensor: torch.Tensor) -> Any:
         if self._model is None:
             raise RuntimeError("Model is not loaded.")
@@ -291,6 +305,12 @@ class InferenceService:
         if isinstance(self._model, FairDetector):
             return self._model({"image": image_tensor}, inference=True)
         return self._model(image_tensor)
+
+    @staticmethod
+    def _forward_loaded_model(model: nn.Module, image_tensor: torch.Tensor) -> Any:
+        if isinstance(model, FairDetector):
+            return model({"image": image_tensor}, inference=True)
+        return model(image_tensor)
 
     def _resolve_cam_targets(self) -> tuple[list[nn.Module], Callable[[torch.Tensor], torch.Tensor] | None]:
         if self._model is None:
@@ -444,8 +464,163 @@ class InferenceService:
             explainability_method="grad_cam" if heatmap_overlay is not None else "none",
         )
 
+    def predict_image(self, image: Image.Image) -> PredictionResult:
+        image_tensor = self._tensor_from_image(image, self._spec)
+        return self.predict(image_tensor=image_tensor, source_image=image)
+
+
+class ScoreFusionInferenceService(InferenceService):
+    """Late-fusion ensemble that combines ViT and Xception fake probabilities."""
+
+    def __init__(
+        self,
+        vit_model_path: Path,
+        xception_model_path: Path,
+        threshold: float,
+        vit_weight: float,
+        xception_weight: float,
+    ) -> None:
+        super().__init__(
+            model_name="vit",
+            model_path=vit_model_path,
+            threshold=threshold,
+        )
+        self.model_name = "hybrid_score_fusion"
+        self._vit_spec = MODEL_REGISTRY["vit"]
+        self._xception_spec = MODEL_REGISTRY["xception"]
+        self.vit_model_path = Path(vit_model_path)
+        self.xception_model_path = Path(xception_model_path)
+
+        total_weight = vit_weight + xception_weight
+        if total_weight <= 0:
+            raise ValueError("Fusion weights must sum to more than 0.")
+        self.vit_weight = vit_weight / total_weight
+        self.xception_weight = xception_weight / total_weight
+
+        self.image_size = self._vit_spec.image_size
+        self.mean = self._vit_spec.mean
+        self.std = self._vit_spec.std
+        self._models: dict[str, nn.Module] = {}
+
+    def ensure_loaded(self) -> None:
+        if self._ready and {"vit", "xception"} <= self._models.keys():
+            return
+        with self._lock:
+            if self._ready and {"vit", "xception"} <= self._models.keys():
+                return
+
+            vit_model = self._load_model_from_path(self._vit_spec, self.vit_model_path)
+            xception_model = self._load_model_from_path(self._xception_spec, self.xception_model_path)
+            self._models = {
+                "vit": vit_model,
+                "xception": xception_model,
+            }
+            self._model = vit_model
+            self._ready = True
+
+    def _resolve_cam_targets(self) -> tuple[list[nn.Module], Callable[[torch.Tensor], torch.Tensor] | None]:
+        if self._model is None:
+            raise RuntimeError("Model is not loaded.")
+
+        grid_size = self._vit_spec.image_size // 16
+        target_layers = [self._model.encoder.layers[-1].ln_1]  # type: ignore[attr-defined]
+
+        def reshape_transform(tensor: torch.Tensor) -> torch.Tensor:
+            result = tensor[:, 1:, :].reshape(tensor.size(0), grid_size, grid_size, tensor.size(2))
+            return result.transpose(2, 3).transpose(1, 2)
+
+        return target_layers, reshape_transform
+
+    def _build_fusion_explanation(
+        self,
+        vit_probability: float,
+        xception_probability: float,
+        fake_probability: float,
+        label: str,
+        has_heatmap: bool,
+    ) -> str:
+        threshold_percent = round(self.threshold * 100, 1)
+        fused_percent = round(fake_probability * 100, 2)
+        vit_percent = round(vit_probability * 100, 2)
+        xception_percent = round(xception_probability * 100, 2)
+        vit_weight_percent = round(self.vit_weight * 100, 1)
+        xception_weight_percent = round(self.xception_weight * 100, 1)
+
+        if label == "FAKE":
+            outcome_text = (
+                f"Fused fake evidence score is {fused_percent}%, above the decision threshold "
+                f"({threshold_percent}%)."
+            )
+        else:
+            outcome_text = (
+                f"Fused fake evidence score is {fused_percent}%, below the decision threshold "
+                f"({threshold_percent}%)."
+            )
+
+        heatmap_text = (
+            "The Grad-CAM overlay is generated from the ViT branch as a visual explanation."
+            if has_heatmap
+            else "Grad-CAM overlay was unavailable for this request."
+        )
+        return (
+            "Prediction is based on score-level fusion between ViT-B/16 and Xception. "
+            f"ViT score: {vit_percent}% with {vit_weight_percent}% weight. "
+            f"Xception score: {xception_percent}% with {xception_weight_percent}% weight. "
+            f"{outcome_text} {heatmap_text}"
+        )
+
+    def predict_image(self, image: Image.Image) -> PredictionResult:
+        self.ensure_loaded()
+        vit_tensor = self._tensor_from_image(image, self._vit_spec)
+        xception_tensor = self._tensor_from_image(image, self._xception_spec)
+
+        with torch.no_grad():
+            vit_output = self._forward_loaded_model(self._models["vit"], vit_tensor)
+            xception_output = self._forward_loaded_model(self._models["xception"], xception_tensor)
+            vit_probability = self._vit_spec.extract_prob(vit_output)
+            xception_probability = self._xception_spec.extract_prob(xception_output)
+
+        fake_probability = (self.vit_weight * vit_probability) + (self.xception_weight * xception_probability)
+        is_fake = fake_probability >= self.threshold
+        label = "FAKE" if is_fake else "REAL"
+        confidence = fake_probability if is_fake else 1.0 - fake_probability
+
+        heatmap_overlay = self._generate_grad_cam_overlay(
+            image_tensor=vit_tensor,
+            label=label,
+            source_image=image,
+        )
+        explanation = self._build_fusion_explanation(
+            vit_probability=vit_probability,
+            xception_probability=xception_probability,
+            fake_probability=fake_probability,
+            label=label,
+            has_heatmap=heatmap_overlay is not None,
+        )
+
+        return PredictionResult(
+            label=label,
+            confidence=round(confidence, 4),
+            fake_probability=round(fake_probability, 4),
+            threshold=self.threshold,
+            explanation=explanation,
+            model_name=self.model_name,
+            heatmap_overlay=heatmap_overlay,
+            explainability_method="grad_cam_vit_branch" if heatmap_overlay is not None else "none",
+        )
+
 
 def model_service_from_settings(settings: Any) -> InferenceService:
+    model_name = settings.model_name.lower()
+    if "hybrid" in model_name or "fusion" in model_name:
+        return ScoreFusionInferenceService(
+            vit_model_path=settings.vit_model_path,
+            xception_model_path=settings.xception_model_path,
+            threshold=settings.fake_threshold,
+            vit_weight=settings.vit_fusion_weight,
+            xception_weight=settings.xception_fusion_weight,
+        )
+
     return InferenceService(
         model_name=settings.model_name,
         model_path=settings.model_path,

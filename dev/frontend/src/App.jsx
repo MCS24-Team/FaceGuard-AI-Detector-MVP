@@ -83,7 +83,7 @@ export default function App() {
           path="/signup"
           element={
             <PublicAuthRoute isAuthenticated={isAuthenticated}>
-              <SignUpPage />
+              <SignUpPage onSignInSuccess={handleSignInSuccess} />
             </PublicAuthRoute>
           }
         />

@@ -65,10 +65,10 @@ export default function GoogleAuthButton({ onSuccess, onError, label = "Continue
 
         buttonRef.current.innerHTML = "";
         window.google.accounts.id.renderButton(buttonRef.current, {
-          theme: "outline",
+          theme: "filled_blue",
           size: "large",
           text: "continue_with",
-          shape: "rectangular",
+          shape: "pill",
           width: buttonRef.current.offsetWidth || 320
         });
       })
@@ -94,6 +94,7 @@ export default function GoogleAuthButton({ onSuccess, onError, label = "Continue
 
   return (
     <div className="google-auth-wrap">
+      <p className="google-auth-kicker">Recommended sign-in option</p>
       <div
         ref={buttonRef}
         className={isSigningIn ? "google-auth-button google-auth-button-busy" : "google-auth-button"}
