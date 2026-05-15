@@ -23,7 +23,12 @@ from .services.storage_placeholder import StoragePlaceholder
 settings = load_settings()
 model_service = model_service_from_settings(settings)
 report_service = ReportService(enabled=settings.enable_detection_report)
-storage = StoragePlaceholder(enabled=settings.enable_database)
+storage = StoragePlaceholder(
+    enabled=settings.enable_database,
+    database_url=settings.database_url,
+    database_name=settings.database_name,
+    upload_collection=settings.upload_collection,
+)
 auth_service = AuthService(
     enabled=settings.enable_database,
     database_url=settings.database_url,
@@ -137,14 +142,7 @@ def analyze_image(file: UploadFile = File(...)) -> PredictionResponse:
         fake_probability=result.fake_probability,
         label=result.label,
     )
-    # storage.save_inference_event(
-    #     {
-    #         "label": result.label,
-    #         "confidence": result.confidence,
-    #         "fake_probability": result.fake_probability,
-    #         "model_name": result.model_name,
-    #     }
-    # )
+    storage.increment_upload_count()
 
     return PredictionResponse(
         label=result.label,
