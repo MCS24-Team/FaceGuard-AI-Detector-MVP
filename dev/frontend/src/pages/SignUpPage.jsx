@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { signUp } from "@/api/client";
+import { USER_EMAIL_STORAGE_KEY } from "@/constants";
 import GoogleAuthButton from "@/components/GoogleAuthButton";
 import logo from "@/assets/logo.png";
 
@@ -65,6 +66,9 @@ export default function SignUpPage({ onSignInSuccess }) {
     setIsError(false);
     setMessage(response.message || "Google account created and signed in.");
     onSignInSuccess?.();
+    if (response?.email) {
+      window.localStorage.setItem(USER_EMAIL_STORAGE_KEY, response.email);
+    }
     navigate("/", { replace: true });
   };
 

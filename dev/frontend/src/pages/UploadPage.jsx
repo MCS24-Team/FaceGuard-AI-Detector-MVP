@@ -4,7 +4,7 @@ import BeforeAfterSlider from "@/components/BeforeAfterSlider";
 import RadarChart from "@/components/RadarChart";
 import useCountUp from "@/hooks/useCountUp";
 import { analyzeImage, fetchHealth } from "@/api/client";
-import { APP_CONFIG } from "@/constants";
+import { APP_CONFIG, USER_EMAIL_STORAGE_KEY } from "@/constants";
 
 const LOADING_NARRATION = [
   "Stripping EXIF metadata…",
@@ -258,7 +258,8 @@ export default function UploadPage() {
     setError("");
     setResult(null);
     try {
-      const payload = await analyzeImage(selectedFile);
+      const storedEmail = window.localStorage.getItem(USER_EMAIL_STORAGE_KEY);
+      const payload = await analyzeImage(selectedFile, storedEmail || "");
       setResult(payload);
     } catch (requestError) {
       setError(requestError.message || "An unexpected error occurred during analysis.");
