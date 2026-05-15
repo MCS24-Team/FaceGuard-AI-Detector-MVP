@@ -58,3 +58,14 @@ class SignUpResponse(BaseModel):
     success: bool = True
     message: str
 
+
+class GoogleAuthRequest(BaseModel):
+    credential: str = Field(default="", min_length=1)
+
+
+class GoogleAuthResponse(BaseModel):
+    success: bool = True
+    message: str
+    email: str
+    name: str | None = None
+

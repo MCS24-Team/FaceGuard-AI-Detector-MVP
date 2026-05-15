@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 
 from .core.settings_loader import load_settings
 from .schemas import (
+    GoogleAuthRequest,
+    GoogleAuthResponse,
     HealthResponse,
     PredictionResponse,
     SignInRequest,
@@ -21,6 +27,7 @@ from .services.storage_placeholder import StoragePlaceholder
 
 
 settings = load_settings()
+logger = logging.getLogger(__name__)
 model_service = model_service_from_settings(settings)
 report_service = ReportService(enabled=settings.enable_detection_report)
 storage = StoragePlaceholder(
@@ -110,38 +117,79 @@ def sign_up(payload: SignUpRequest) -> SignUpResponse:
     return SignUpResponse(success=True, message=message)
 
 
+@app.post("/api/auth/google", response_model=GoogleAuthResponse)
+def google_auth(payload: GoogleAuthRequest) -> GoogleAuthResponse:
+    if not settings.google_client_id:
+        raise HTTPException(
+            status_code=503,
+            detail="Google sign-in is not configured. Set FACEGUARD_GOOGLE_CLIENT_ID.",
+        )
+
+    try:
+        claims = google_id_token.verify_oauth2_token(
+            payload.credential,
+            google_requests.Request(),
+            settings.google_client_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail="Invalid Google sign-in token.") from exc
+
+    if not claims.get("email_verified"):
+        raise HTTPException(status_code=401, detail="Google account email is not verified.")
+
+    email = str(claims.get("email") or "").strip()
+    google_sub = str(claims.get("sub") or "").strip()
+    name = claims.get("name")
+    picture = claims.get("picture")
+
+    success, message, status_code = auth_service.authenticate_google_user(
+        email=email,
+        google_sub=google_sub,
+        name=str(name) if name else None,
+        picture=str(picture) if picture else None,
+    )
+
+    if not success:
+        raise HTTPException(status_code=status_code, detail=message)
+
+    return GoogleAuthResponse(success=True, message=message, email=email, name=name)
+
+
 @app.post("/api/analyze", response_model=PredictionResponse)
 def analyze_image(file: UploadFile = File(...)) -> PredictionResponse:
     try:
         model_service.ensure_loaded()
+
+        raw = validate_upload(
+            upload=file,
+            allowed_mime_types=settings.allowed_mime_types,
+            max_upload_bytes=settings.max_upload_bytes,
+        )
+        image = strip_exif_and_load_image(raw)
+        inference_image = crop_largest_face(
+            image=image,
+            enabled=settings.enable_face_crop,
+            margin=settings.face_crop_margin,
+        )
+        tensor = image_to_tensor(
+            image=inference_image,
+            image_size=model_service.image_size,
+            device=model_service.device,
+            mean=model_service.mean,
+            std=model_service.std,
+        )
+
+        result = model_service.predict(image_tensor=tensor, source_image=inference_image)
+        report = report_service.build_report(
+            image=image,
+            fake_probability=result.fake_probability,
+            label=result.label,
+        )
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-    raw = validate_upload(
-        upload=file,
-        allowed_mime_types=settings.allowed_mime_types,
-        max_upload_bytes=settings.max_upload_bytes,
-    )
-    image = strip_exif_and_load_image(raw)
-    inference_image = crop_largest_face(
-        image=image,
-        enabled=settings.enable_face_crop,
-        margin=settings.face_crop_margin,
-    )
-    tensor = image_to_tensor(
-        image=inference_image,
-        image_size=model_service.image_size,
-        device=model_service.device,
-        mean=model_service.mean,
-        std=model_service.std,
-    )
-
-    result = model_service.predict(image_tensor=tensor, source_image=inference_image)
-    report = report_service.build_report(
-        image=image,
-        fake_probability=result.fake_probability,
-        label=result.label,
-    )
+        logger.exception("Image analysis failed.")
+        raise HTTPException(status_code=500, detail=f"Image analysis failed: {exc.__class__.__name__}") from exc
     storage.increment_upload_count()
 
     return PredictionResponse(

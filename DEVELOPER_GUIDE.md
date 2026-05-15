@@ -99,18 +99,18 @@ Verify backend health:
 
 - `http://127.0.0.1:8000/api/health`
 
-Expected JSON:
+Expected JSON when score-level fusion is active:
 
 ```json
 {
   "status": "ok",
   "model_ready": true,
-  "model_name": "vit"
+  "model_name": "hybrid_score_fusion"
 }
 ```
 
 If `model_ready` is `false`, confirm that the configured checkpoint exists in
-`models/pretrained/` and can be loaded.
+`models/baseline/` or `models/pretrained/` and can be loaded.
 
 ## 6. Model Switching Procedure
 

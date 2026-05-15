@@ -1,5 +1,17 @@
 import { API_BASE_URL } from "@/constants";
 
+async function readPayload(response, fallbackMessage) {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  const text = await response.text();
+  return {
+    detail: text || fallbackMessage
+  };
+}
+
 export async function fetchHealth() {
   const response = await fetch(`${API_BASE_URL}/api/health`);
   if (!response.ok) {
@@ -17,7 +29,7 @@ export async function analyzeImage(file) {
     body: formData
   });
 
-  const payload = await response.json();
+  const payload = await readPayload(response, "Inference failed.");
   if (!response.ok) {
     throw new Error(payload.detail || "Inference failed.");
   }
@@ -33,7 +45,7 @@ export async function signIn(credentials) {
     body: JSON.stringify(credentials)
   });
 
-  const payload = await response.json();
+  const payload = await readPayload(response, "Sign in failed.");
   if (!response.ok) {
     const { detail } = payload;
     if (Array.isArray(detail)) {
@@ -53,13 +65,33 @@ export async function signUp(credentials) {
     body: JSON.stringify(credentials)
   });
 
-  const payload = await response.json();
+  const payload = await readPayload(response, "Sign up failed.");
   if (!response.ok) {
     const { detail } = payload;
     if (Array.isArray(detail)) {
       throw new Error(detail.map((item) => item?.msg).filter(Boolean).join("; ") || "Sign up failed.");
     }
     throw new Error(detail || "Sign up failed.");
+  }
+  return payload;
+}
+
+export async function googleAuth(credential) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/google`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ credential })
+  });
+
+  const payload = await readPayload(response, "Google sign in failed.");
+  if (!response.ok) {
+    const { detail } = payload;
+    if (Array.isArray(detail)) {
+      throw new Error(detail.map((item) => item?.msg).filter(Boolean).join("; ") || "Google sign in failed.");
+    }
+    throw new Error(detail || "Google sign in failed.");
   }
   return payload;
 }

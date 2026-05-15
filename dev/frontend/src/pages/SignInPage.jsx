@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { signIn } from "@/api/client";
+import GoogleAuthButton from "@/components/GoogleAuthButton";
 import logo from "@/assets/logo.png";
 
 export default function SignInPage({ onSignInSuccess }) {
@@ -42,6 +43,18 @@ export default function SignInPage({ onSignInSuccess }) {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleGoogleSuccess = (response) => {
+    setIsError(false);
+    setMessage(response.message || "Google sign in successful.");
+    onSignInSuccess?.();
+    navigate("/", { replace: true });
+  };
+
+  const handleGoogleError = (error) => {
+    setIsError(true);
+    setMessage(error.message || "Unable to sign in with Google.");
   };
 
   return (
@@ -98,6 +111,12 @@ export default function SignInPage({ onSignInSuccess }) {
               {isSubmitting ? "Signing In..." : "Sign In"}
             </button>
           </form>
+
+          <div className="auth-divider">
+            <span>or</span>
+          </div>
+
+          <GoogleAuthButton onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
 
           {message ? (
             <p className={isError ? "auth-feedback auth-feedback-error" : "auth-feedback auth-feedback-success"}>

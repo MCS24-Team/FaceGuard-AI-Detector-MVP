@@ -43,12 +43,20 @@ def _gray(region: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(region, cv2.COLOR_RGB2GRAY)
 
 
+def _texture_gray(region: np.ndarray) -> np.ndarray:
+    gray = _gray(region)
+    if gray.size <= 1:
+        return gray
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    return clahe.apply(gray)
+
+
 def _sharpness(region: np.ndarray) -> float:
-    return float(cv2.Laplacian(_gray(region), cv2.CV_64F).var())
+    return float(cv2.Laplacian(_texture_gray(region), cv2.CV_64F).var())
 
 
 def _edge_density(region: np.ndarray) -> float:
-    edges = cv2.Canny(_gray(region), 80, 160)
+    edges = cv2.Canny(_texture_gray(region), 80, 160)
     return float(edges.mean() / 255.0)
 
 
