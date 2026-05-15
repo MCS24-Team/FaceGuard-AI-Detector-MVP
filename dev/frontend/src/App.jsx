@@ -6,6 +6,7 @@ import GuidePage from "@/pages/GuidePage";
 import SignInPage from "@/pages/SignInPage";
 import SignUpPage from "@/pages/SignUpPage";
 import UploadPage from "@/pages/UploadPage";
+import { USER_EMAIL_STORAGE_KEY } from "@/constants";
 
 const AUTH_STORAGE_KEY = "faceguard:isAuthenticated";
 
@@ -40,6 +41,7 @@ export default function App() {
 
   const handleSignOut = () => {
     window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    window.localStorage.removeItem(USER_EMAIL_STORAGE_KEY);
     setIsAuthenticated(false);
   };
 

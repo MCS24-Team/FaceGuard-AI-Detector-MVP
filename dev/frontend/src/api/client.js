@@ -20,9 +20,12 @@ export async function fetchHealth() {
   return response.json();
 }
 
-export async function analyzeImage(file) {
+export async function analyzeImage(file, email) {
   const formData = new FormData();
   formData.append("file", file);
+  if (email) {
+    formData.append("email", email);
+  }
 
   const response = await fetch(`${API_BASE_URL}/api/analyze`, {
     method: "POST",

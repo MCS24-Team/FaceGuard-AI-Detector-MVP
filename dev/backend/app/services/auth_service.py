@@ -164,6 +164,29 @@ class AuthService:
 
 		return True, "Google account created and signed in.", 201
 
+	def increment_user_upload_count(self, email: str) -> None:
+		if not self.enabled:
+			return
+
+		normalized_email = email.strip().lower()
+		if not normalized_email:
+			return
+
+		try:
+			users = self._get_users_collection()
+			users.update_one(
+				{
+					"email": {
+						"$regex": f"^{re.escape(normalized_email)}$",
+						"$options": "i",
+					}
+				},
+				{"$inc": {"upload_count": 1}},
+				upsert=False,
+			)
+		except PyMongoError:
+			return
+
 	def _get_users_collection(self) -> Collection:
 		if self._client is None:
 			self._client = MongoClient(self.database_url, serverSelectionTimeoutMS=5000)

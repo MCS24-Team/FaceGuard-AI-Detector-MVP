@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { signIn } from "@/api/client";
+import { USER_EMAIL_STORAGE_KEY } from "@/constants";
 import GoogleAuthButton from "@/components/GoogleAuthButton";
 import logo from "@/assets/logo.png";
 
@@ -34,6 +35,7 @@ export default function SignInPage({ onSignInSuccess }) {
       const response = await signIn({ email: submittedEmail, password: submittedPassword });
       setMessage(response.message || "Sign in successful.");
       onSignInSuccess?.();
+      window.localStorage.setItem(USER_EMAIL_STORAGE_KEY, submittedEmail);
       setEmail(submittedEmail);
       setPassword("");
       navigate("/", { replace: true });
@@ -49,6 +51,9 @@ export default function SignInPage({ onSignInSuccess }) {
     setIsError(false);
     setMessage(response.message || "Google sign in successful.");
     onSignInSuccess?.();
+    if (response?.email) {
+      window.localStorage.setItem(USER_EMAIL_STORAGE_KEY, response.email);
+    }
     navigate("/", { replace: true });
   };
 

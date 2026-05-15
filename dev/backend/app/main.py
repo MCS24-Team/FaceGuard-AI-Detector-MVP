@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from google.auth.transport import requests as google_requests
@@ -23,19 +23,12 @@ from .services.auth_service import AuthService
 from .services.model_service import model_service_from_settings
 from .services.preprocessing import crop_largest_face, image_to_tensor, strip_exif_and_load_image, validate_upload
 from .services.report_service import ReportService
-from .services.storage_placeholder import StoragePlaceholder
 
 
 settings = load_settings()
 logger = logging.getLogger(__name__)
 model_service = model_service_from_settings(settings)
 report_service = ReportService(enabled=settings.enable_detection_report)
-storage = StoragePlaceholder(
-    enabled=settings.enable_database,
-    database_url=settings.database_url,
-    database_name=settings.database_name,
-    upload_collection=settings.upload_collection,
-)
 auth_service = AuthService(
     enabled=settings.enable_database,
     database_url=settings.database_url,
@@ -156,7 +149,10 @@ def google_auth(payload: GoogleAuthRequest) -> GoogleAuthResponse:
 
 
 @app.post("/api/analyze", response_model=PredictionResponse)
-def analyze_image(file: UploadFile = File(...)) -> PredictionResponse:
+def analyze_image(
+    file: UploadFile = File(...),
+    email: str | None = Form(default=None),
+) -> PredictionResponse:
     try:
         model_service.ensure_loaded()
 
@@ -185,12 +181,13 @@ def analyze_image(file: UploadFile = File(...)) -> PredictionResponse:
             fake_probability=result.fake_probability,
             label=result.label,
         )
+        if email:
+            auth_service.increment_user_upload_count(email)
     except HTTPException:
         raise
     except Exception as exc:
         logger.exception("Image analysis failed.")
         raise HTTPException(status_code=500, detail=f"Image analysis failed: {exc.__class__.__name__}") from exc
-    storage.increment_upload_count()
 
     return PredictionResponse(
         label=result.label,
