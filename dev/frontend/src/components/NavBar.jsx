@@ -5,6 +5,7 @@ import logo from "@/assets/logo.png";
 const NAV_ITEMS = [
   { to: "/", label: "Home", end: true },
   { to: "/upload", label: "Detector", end: false },
+  { to: "/profile", label: "Profile", end: false },
   { to: "/guide", label: "Guide", end: false }
 ];
 

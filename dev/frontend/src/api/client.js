@@ -20,6 +20,16 @@ export async function fetchHealth() {
   return response.json();
 }
 
+export async function fetchUserProfile(email) {
+  const query = new URLSearchParams({ email }).toString();
+  const response = await fetch(`${API_BASE_URL}/api/profile?${query}`);
+  const payload = await readPayload(response, "Failed to load profile.");
+  if (!response.ok) {
+    throw new Error(payload.detail || "Failed to load profile.");
+  }
+  return payload;
+}
+
 export async function analyzeImage(file, email) {
   const formData = new FormData();
   formData.append("file", file);
