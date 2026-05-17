@@ -18,6 +18,7 @@ from .schemas import (
     SignInResponse,
     SignUpRequest,
     SignUpResponse,
+    UserProfileResponse,
 )
 from .services.auth_service import AuthService
 from .services.model_service import model_service_from_settings
@@ -148,6 +149,14 @@ def google_auth(payload: GoogleAuthRequest) -> GoogleAuthResponse:
     return GoogleAuthResponse(success=True, message=message, email=email, name=name)
 
 
+@app.get("/api/profile", response_model=UserProfileResponse)
+def get_profile(email: str) -> UserProfileResponse:
+    success, payload, status_code = auth_service.get_user_profile(email=email)
+    if not success:
+        raise HTTPException(status_code=status_code, detail=payload)
+    return UserProfileResponse(**payload)
+
+
 @app.post("/api/analyze", response_model=PredictionResponse)
 def analyze_image(
     file: UploadFile = File(...),
@@ -182,7 +191,13 @@ def analyze_image(
             label=result.label,
         )
         if email:
-            auth_service.increment_user_upload_count(email)
+            auth_service.record_analysis_result(
+                email=email,
+                label=result.label,
+                fake_probability=result.fake_probability,
+                confidence=result.confidence,
+                model_name=result.model_name,
+            )
     except HTTPException:
         raise
     except Exception as exc:

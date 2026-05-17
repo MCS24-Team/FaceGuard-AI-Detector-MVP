@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import NavBar from "@/components/NavBar";
 import HomePage from "@/pages/HomePage";
 import GuidePage from "@/pages/GuidePage";
+import ProfilePage from "@/pages/ProfilePage";
 import SignInPage from "@/pages/SignInPage";
 import SignUpPage from "@/pages/SignUpPage";
 import UploadPage from "@/pages/UploadPage";
@@ -62,6 +63,14 @@ export default function App() {
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated}>
               <GuidePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated}>
+              <ProfilePage />
             </ProtectedRoute>
           }
         />
