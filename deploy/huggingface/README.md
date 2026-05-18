@@ -1,7 +1,7 @@
 ---
 title: FaceGuard API
-emoji: 🛡️
-colorFrom: teal
+emoji: 🔍
+colorFrom: green
 colorTo: blue
 sdk: docker
 pinned: false
