@@ -1,0 +1,38 @@
+name: Deploy Backend to Hugging Face Space
+
+on:
+  push:
+    branches:
+      - main
+      - yanyi
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout MVP repo
+        uses: actions/checkout@v4
+
+      - name: Prepare Space files
+        run: |
+          mkdir space-build
+          cp deploy/huggingface/Dockerfile space-build/Dockerfile
+          cp requirements.txt space-build/requirements.txt
+          cp -r config space-build/config
+          mkdir -p space-build/dev
+          cp -r dev/backend space-build/dev/backend
+
+      - name: Push to Hugging Face Space
+        run: |
+          cd space-build
+          git init
+          git config user.email "actions@github.com"
+          git config user.name "github-actions"
+          git add .
+          git commit -m "Deploy backend from GitHub Actions"
+          git branch -M main
+          git remote add space https://huggingface:${HF_TOKEN}@huggingface.co/spaces/mcsmonash24/faceguard-api
+          git push --force space main
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}

@@ -220,4 +220,3 @@ def analyze_image(
 @app.exception_handler(HTTPException)
 def http_exception_handler(_, exc: HTTPException):
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-
