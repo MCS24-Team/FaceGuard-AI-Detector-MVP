@@ -412,15 +412,14 @@ class InferenceService:
             return None
 
     def _build_explanation(self, fake_probability: float, label: str, has_heatmap: bool) -> str:
-        threshold_percent = round(self.threshold * 100, 1)
         fake_percent = round(fake_probability * 100, 2)
         if label == "FAKE":
             outcome_text = (
-                f"Fake evidence score is {fake_percent}%, above the decision threshold ({threshold_percent}%)."
+                f"Fake evidence score is {fake_percent}%, so the image was classified as likely AI-generated."
             )
         else:
             outcome_text = (
-                f"Fake evidence score is {fake_percent}%, below the decision threshold ({threshold_percent}%)."
+                f"Fake evidence score is {fake_percent}%, so the image was classified as likely real."
             )
 
         if has_heatmap:
@@ -539,7 +538,6 @@ class ScoreFusionInferenceService(InferenceService):
         label: str,
         has_heatmap: bool,
     ) -> str:
-        threshold_percent = round(self.threshold * 100, 1)
         fused_percent = round(fake_probability * 100, 2)
         vit_percent = round(vit_probability * 100, 2)
         xception_percent = round(xception_probability * 100, 2)
@@ -548,13 +546,11 @@ class ScoreFusionInferenceService(InferenceService):
 
         if label == "FAKE":
             outcome_text = (
-                f"Fused fake evidence score is {fused_percent}%, above the decision threshold "
-                f"({threshold_percent}%)."
+                f"Fused fake evidence score is {fused_percent}%, so the image was classified as likely AI-generated."
             )
         else:
             outcome_text = (
-                f"Fused fake evidence score is {fused_percent}%, below the decision threshold "
-                f"({threshold_percent}%)."
+                f"Fused fake evidence score is {fused_percent}%, so the image was classified as likely real."
             )
 
         heatmap_text = (

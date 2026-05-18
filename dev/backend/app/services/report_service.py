@@ -535,25 +535,24 @@ class ReportService:
             if has_face
             else " Some facial regions were not clear enough to isolate, so those items should be read as softer estimates."
         )
-        verdict = "above" if label == "FAKE" else "below"
         image_type = "portrait" if has_face else "image"
         if overall_score <= 5:
             return (
                 f"This {image_type} received an overall forgery score of {overall_score:.1f}%, which is "
-                f"well below the current decision boundary for the returned label. The breakdown may still "
-                f"note minor softness or low-detail areas, but these should not be read as strong concerns "
-                f"because the model found almost no forgery evidence.{face_note}"
+                f"a very low forgery signal. The breakdown may still note minor softness or low-detail "
+                f"areas, but these should not be read as strong concerns because the model found almost "
+                f"no forgery evidence.{face_note}"
             )
         if overall_score <= 20:
             return (
                 f"This {image_type} received an overall forgery score of {overall_score:.1f}%, which is "
-                f"below the current decision boundary for the returned label. The most noticeable minor "
-                f"visual notes are {signal_names}, but they are weak signals and do not outweigh the low "
-                f"model score.{face_note}"
+                f"still a low forgery signal. The most noticeable minor visual notes are {signal_names}, "
+                f"but they are weak signals and do not outweigh the low model score.{face_note}"
             )
+        label_phrase = "a likely AI-generated result" if label == "FAKE" else "a likely real result"
         return (
-            f"This {image_type} received an overall forgery score of {overall_score:.1f}%, which is {verdict} "
-            f"the current decision boundary for the returned label. The most noticeable supporting signals "
-            f"are {signal_names}. These observations describe visible image patterns and should be read "
-            f"together with the model score, not as proof by themselves.{face_note}"
+            f"This {image_type} received an overall forgery score of {overall_score:.1f}% and returned "
+            f"{label_phrase}. The most noticeable supporting signals are {signal_names}. These observations "
+            f"describe visible image patterns and should be read together with the model score, not as proof "
+            f"by themselves.{face_note}"
         )
