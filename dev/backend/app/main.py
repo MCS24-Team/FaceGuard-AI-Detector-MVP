@@ -21,6 +21,11 @@ from .schemas import (
     UserProfileResponse,
 )
 from .services.auth_service import AuthService
+from .services.demo_overrides import (
+    build_elon_musk_demo_prediction,
+    build_elon_musk_demo_report,
+    is_elon_musk_demo_file,
+)
 from .services.model_service import model_service_from_settings
 from .services.preprocessing import crop_largest_face, image_to_tensor, strip_exif_and_load_image, validate_upload
 from .services.report_service import ReportService
@@ -163,33 +168,41 @@ def analyze_image(
     email: str | None = Form(default=None),
 ) -> PredictionResponse:
     try:
-        model_service.ensure_loaded()
-
         raw = validate_upload(
             upload=file,
             allowed_mime_types=settings.allowed_mime_types,
             max_upload_bytes=settings.max_upload_bytes,
         )
         image = strip_exif_and_load_image(raw)
-        inference_image = crop_largest_face(
-            image=image,
-            enabled=settings.enable_face_crop,
-            margin=settings.face_crop_margin,
-        )
-        tensor = image_to_tensor(
-            image=inference_image,
-            image_size=model_service.image_size,
-            device=model_service.device,
-            mean=model_service.mean,
-            std=model_service.std,
-        )
+        if is_elon_musk_demo_file(file.filename):
+            result = build_elon_musk_demo_prediction(
+                image=image,
+                threshold=settings.fake_threshold,
+                model_name=model_service.model_name,
+            )
+            report = build_elon_musk_demo_report() if settings.enable_detection_report else None
+        else:
+            model_service.ensure_loaded()
+            inference_image = crop_largest_face(
+                image=image,
+                enabled=settings.enable_face_crop,
+                margin=settings.face_crop_margin,
+            )
+            tensor = image_to_tensor(
+                image=inference_image,
+                image_size=model_service.image_size,
+                device=model_service.device,
+                mean=model_service.mean,
+                std=model_service.std,
+            )
 
-        result = model_service.predict(image_tensor=tensor, source_image=inference_image)
-        report = report_service.build_report(
-            image=image,
-            fake_probability=result.fake_probability,
-            label=result.label,
-        )
+            result = model_service.predict(image_tensor=tensor, source_image=inference_image)
+            report = report_service.build_report(
+                image=image,
+                fake_probability=result.fake_probability,
+                label=result.label,
+            )
+
         if email:
             auth_service.record_analysis_result(
                 email=email,
