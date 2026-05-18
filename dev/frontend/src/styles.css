@@ -268,6 +268,102 @@ h1, h2, h3, h4, h5 {
   font-weight: 600;
 }
 
+.nav-account-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.account-avatar-btn {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border-accent);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-grad);
+  color: var(--navy-950);
+  box-shadow: 0 0 22px rgba(79, 209, 197, 0.22);
+  cursor: pointer;
+  transition: transform 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+
+.account-avatar-btn span {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.account-avatar-btn:hover,
+.account-avatar-btn-open {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 4px rgba(79, 209, 197, 0.12), 0 0 26px rgba(79, 209, 197, 0.34);
+}
+
+.account-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 180px;
+  padding: 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(9, 14, 30, 0.96);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(18px) saturate(160%);
+  z-index: 50;
+  animation: account-menu-in 0.16s var(--ease-out);
+}
+
+.account-dropdown::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  right: 16px;
+  width: 10px;
+  height: 10px;
+  border-left: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  background: rgba(9, 14, 30, 0.96);
+  transform: rotate(45deg);
+}
+
+@keyframes account-menu-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.account-dropdown-item {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: transparent;
+  color: var(--ink-200);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-dropdown-item:hover {
+  background: rgba(79, 209, 197, 0.1);
+  color: var(--text);
+}
+
+.account-dropdown-danger {
+  color: #ffdada;
+}
+
+.account-dropdown-danger:hover {
+  background: rgba(248, 113, 113, 0.12);
+  color: #fff0f0;
+}
+
 /* =========================================================
    Buttons
    ========================================================= */
@@ -1908,7 +2004,8 @@ h1 {
 
 .profile-identity {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 22px;
 }
 
@@ -2003,7 +2100,7 @@ h1 {
 
 .profile-stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -2047,6 +2144,10 @@ h1 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
+}
+
+.profile-grid-compact {
+  align-items: stretch;
 }
 
 .profile-card {
@@ -2358,6 +2459,10 @@ h1 {
     grid-template-columns: 1fr;
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .profile-identity .profile-avatar-placeholder {
+    align-self: flex-start;
   }
 
   .profile-stat-grid,

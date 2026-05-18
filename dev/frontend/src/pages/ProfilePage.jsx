@@ -93,71 +93,6 @@ function RealFakeDonut({ realCount, fakeCount }) {
   );
 }
 
-function RiskDistribution({ stats }) {
-  const risks = [
-    { key: "low", label: "Low Risk", count: stats.low_risk_count || 0, cls: "risk-low" },
-    { key: "medium", label: "Medium Risk", count: stats.medium_risk_count || 0, cls: "risk-medium" },
-    { key: "high", label: "High Risk", count: stats.high_risk_count || 0, cls: "risk-high" }
-  ];
-  const total = Math.max(1, risks.reduce((sum, item) => sum + item.count, 0));
-
-  return (
-    <section className="panel profile-card">
-      <div className="profile-card-head">
-        <p className="profile-kicker">Risk Distribution</p>
-        <h3>Forgery Score Ranges</h3>
-      </div>
-      <div className="risk-list">
-        {risks.map((item) => {
-          const percent = (item.count / total) * 100;
-          return (
-            <div className="risk-row" key={item.key}>
-              <div className="risk-row-top">
-                <span>{item.label}</span>
-                <strong className="num">{item.count}</strong>
-              </div>
-              <div className="risk-track">
-                <div className={`risk-fill ${item.cls}`} style={{ width: `${percent}%` }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function ActivityChart({ points }) {
-  const maxCount = Math.max(1, ...points.map((item) => item.count || 0));
-
-  return (
-    <section className="panel profile-card profile-activity-card">
-      <div className="profile-card-head">
-        <p className="profile-kicker">Activity</p>
-        <h3>Recent Scan Activity</h3>
-      </div>
-      {points.length ? (
-        <div className="activity-bars">
-          {points.map((item) => (
-            <div className="activity-bar-item" key={item.date}>
-              <div className="activity-bar-wrap">
-                <div
-                  className="activity-bar-fill"
-                  style={{ height: `${Math.max(10, (item.count / maxCount) * 100)}%` }}
-                />
-              </div>
-              <strong className="num">{item.count}</strong>
-              <span>{formatShortDate(item.date)}</span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="profile-empty">No scan activity has been recorded yet.</p>
-      )}
-    </section>
-  );
-}
-
 function RecentHistory({ items }) {
   return (
     <section className="panel profile-card profile-history-card">
@@ -219,9 +154,7 @@ export default function ProfilePage() {
 
   const stats = profile?.stats || {};
   const totalScans = stats.total_scans || 0;
-  const averageScore = Number(stats.average_forgery_score || 0);
   const animatedTotal = useCountUp(totalScans, { duration: 800, decimals: 0 });
-  const animatedAverage = useCountUp(averageScore, { duration: 800, decimals: 1 });
 
   const initials = useMemo(() => {
     const source = profile?.name || profile?.email || "U";
@@ -256,7 +189,6 @@ export default function ProfilePage() {
     <main className="page profile-page">
       <section className="panel profile-hero">
         <div className="profile-identity">
-          <ProfileAvatar initials={initials} />
           <div>
             <p className="profile-kicker">User Profile</p>
             <h1>{profile.name || "FaceGuard User"}</h1>
@@ -266,6 +198,7 @@ export default function ProfilePage() {
               <span>Created {formatDate(profile.created_at)}</span>
             </div>
           </div>
+          <ProfileAvatar initials={initials} />
         </div>
       </section>
 
@@ -273,18 +206,10 @@ export default function ProfilePage() {
         <StatCard label="Total scans" value={animatedTotal.toFixed(0)} helper="Images analyzed" tone="default" />
         <StatCard label="Real results" value={stats.real_count || 0} helper="Predicted authentic" tone="real" />
         <StatCard label="Fake results" value={stats.fake_count || 0} helper="Predicted suspicious" tone="fake" />
-        <StatCard
-          label="Average forgery score"
-          value={`${animatedAverage.toFixed(1)}%`}
-          helper="Across recent scans"
-          tone="score"
-        />
       </section>
 
-      <section className="profile-grid">
+      <section className="profile-grid profile-grid-compact">
         <RealFakeDonut realCount={stats.real_count || 0} fakeCount={stats.fake_count || 0} />
-        <RiskDistribution stats={stats} />
-        <ActivityChart points={profile.activity_by_day || []} />
         <section className="panel profile-card profile-privacy-card">
           <div className="profile-card-head">
             <p className="profile-kicker">Privacy</p>

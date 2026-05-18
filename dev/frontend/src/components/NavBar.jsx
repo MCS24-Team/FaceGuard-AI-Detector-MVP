@@ -5,16 +5,17 @@ import logo from "@/assets/logo.png";
 const NAV_ITEMS = [
   { to: "/", label: "Home", end: true },
   { to: "/upload", label: "Detector", end: false },
-  { to: "/profile", label: "Profile", end: false },
   { to: "/guide", label: "Guide", end: false }
 ];
 
 export default function NavBar({ onSignOut }) {
   const location = useLocation();
   const menuRef = useRef(null);
+  const accountMenuRef = useRef(null);
   const itemRefs = useRef({});
   const [pill, setPill] = useState({ left: 0, width: 0, visible: false });
   const [scrolled, setScrolled] = useState(false);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
 
   useLayoutEffect(() => {
     const activeItem = NAV_ITEMS.find((item) =>
@@ -41,6 +42,33 @@ export default function NavBar({ onSignOut }) {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    if (!isAccountOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target)) {
+        setIsAccountOpen(false);
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsAccountOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isAccountOpen]);
+
+  const handleSignOutClick = () => {
+    setIsAccountOpen(false);
+    onSignOut?.();
+  };
 
   return (
     <header className={scrolled ? "top-nav is-scrolled" : "top-nav"}>
@@ -69,9 +97,39 @@ export default function NavBar({ onSignOut }) {
         ))}
       </nav>
 
-      <button type="button" className="secondary-btn" onClick={onSignOut}>
-        Sign Out
-      </button>
+      <div className="nav-account-menu" ref={accountMenuRef}>
+        <button
+          type="button"
+          className={isAccountOpen ? "account-avatar-btn account-avatar-btn-open" : "account-avatar-btn"}
+          aria-label="Open account menu"
+          aria-haspopup="menu"
+          aria-expanded={isAccountOpen}
+          onClick={() => setIsAccountOpen((open) => !open)}
+        >
+          <span aria-hidden="true">FG</span>
+        </button>
+
+        {isAccountOpen ? (
+          <div className="account-dropdown" role="menu">
+            <NavLink
+              to="/profile"
+              role="menuitem"
+              className="account-dropdown-item"
+              onClick={() => setIsAccountOpen(false)}
+            >
+              Profile
+            </NavLink>
+            <button
+              type="button"
+              role="menuitem"
+              className="account-dropdown-item account-dropdown-danger"
+              onClick={handleSignOutClick}
+            >
+              Sign Out
+            </button>
+          </div>
+        ) : null}
+      </div>
     </header>
   );
 }
