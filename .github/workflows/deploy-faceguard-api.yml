@@ -18,6 +18,7 @@ jobs:
         run: |
           mkdir space-build
           cp deploy/huggingface/Dockerfile space-build/Dockerfile
+          cp deploy/huggingface/README.md space-build/README.md
           cp requirements.txt space-build/requirements.txt
           cp -r config space-build/config
           mkdir -p space-build/dev
